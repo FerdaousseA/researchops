@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     embedding_cache_dir: str = "/data/models"
     qdrant_collection: str = "chunks"
+    gemini_api_key: str = ""
+    llm_model: str = "gemini-2.5-flash"
 
 
 settings = Settings()
