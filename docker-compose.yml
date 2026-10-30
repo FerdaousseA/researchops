@@ -8,6 +8,7 @@ services:
     volumes:
       - ./backend:/app
       - uploads_data:/data/uploads
+      - models_cache:/data/models
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,3 +51,4 @@ volumes:
   redis_data:
   qdrant_data:
   uploads_data:
+  models_cache:
