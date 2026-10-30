@@ -14,6 +14,7 @@ from app.config import settings
 from app.database import Base, engine, get_db
 from app.ingestion import chunk_pdf
 from app.embeddings import embed_passages
+from app.vectorstore import index_chunks, search
 
 
 @asynccontextmanager
@@ -135,3 +136,37 @@ def embed_test(doc_id: uuid.UUID, db: Session = Depends(get_db)):
         "dimensions": len(vectors[0]) if vectors else 0,
         "first_values_of_chunk_0": vectors[0][:5] if vectors else [],
     }
+
+@app.post("/documents/{doc_id}/index")
+def index_document(doc_id: uuid.UUID, db: Session = Depends(get_db)):
+    doc = db.get(models.Document, doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document introuvable")
+
+    try:
+        chunks = chunk_pdf(Path(settings.upload_dir) / f"{doc_id}.pdf")
+        if not chunks:
+            raise ValueError("Aucun texte extractible dans ce PDF")
+        count = index_chunks(doc_id, doc.filename, chunks)
+        doc.status = "indexed"
+        db.commit()
+    except Exception as e:
+        doc.status = "failed"
+        db.commit()
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"id": str(doc_id), "status": doc.status, "chunks_indexed": count}
+
+
+@app.get("/search")
+def search_chunks(q: str, limit: int = 5, doc_id: uuid.UUID | None = None):
+    points = search(q, limit=limit, doc_id=doc_id)
+    return [
+        {
+            "score": round(p.score, 4),
+            "filename": p.payload["filename"],
+            "page": p.payload["page"],
+            "text": p.payload["text"],
+        }
+        for p in points
+    ]

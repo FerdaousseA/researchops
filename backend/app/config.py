@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     upload_dir: str = "/data/uploads"
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     embedding_cache_dir: str = "/data/models"
+    qdrant_collection: str = "chunks"
 
 
 settings = Settings()
