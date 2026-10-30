@@ -5,3 +5,4 @@ qdrant-client
 redis
 psycopg[binary]
 sqlalchemy
+python-multipart

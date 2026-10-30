@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     redis_url: str
     qdrant_url: str
     anthropic_api_key: str = ""
+    upload_dir: str = "/data/uploads"
 
 
 settings = Settings()

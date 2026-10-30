@@ -1,8 +1,10 @@
+import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import psycopg
 import redis
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from qdrant_client import QdrantClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -65,3 +67,36 @@ def list_documents(db: Session = Depends(get_db)):
         }
         for d in docs
     ]
+
+
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 Mo
+
+
+@app.post("/documents", status_code=201)
+async def upload_document(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    content = await file.read()
+
+    if not content.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="Le fichier doit être un PDF valide")
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Fichier trop volumineux (max 20 Mo)")
+
+    doc_id = uuid.uuid4()
+    upload_dir = Path(settings.upload_dir)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    (upload_dir / f"{doc_id}.pdf").write_bytes(content)
+
+    doc = models.Document(
+        id=doc_id,
+        filename=Path(file.filename or "document.pdf").name,
+        content_type="application/pdf",
+        size_bytes=len(content),
+        status="pending",
+    )
+    db.add(doc)
+    db.commit()
+
+    return {"id": str(doc.id), "filename": doc.filename, "status": doc.status}
