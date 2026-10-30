@@ -6,3 +6,4 @@ redis
 psycopg[binary]
 sqlalchemy
 python-multipart
+pypdf

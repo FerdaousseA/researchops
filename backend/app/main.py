@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app import models
 from app.config import settings
 from app.database import Base, engine, get_db
+from app.ingestion import chunk_pdf
 
 
 @asynccontextmanager
@@ -100,3 +101,21 @@ async def upload_document(
     db.commit()
 
     return {"id": str(doc.id), "filename": doc.filename, "status": doc.status}
+
+@app.get("/documents/{doc_id}/chunks")
+def preview_chunks(doc_id: uuid.UUID, db: Session = Depends(get_db)):
+    doc = db.get(models.Document, doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document introuvable")
+
+    pdf_path = Path(settings.upload_dir) / f"{doc_id}.pdf"
+    chunks = chunk_pdf(pdf_path)
+
+    return {
+        "filename": doc.filename,
+        "total_chunks": len(chunks),
+        "preview": [
+            {"index": c.index, "page": c.page, "length": len(c.text), "text": c.text}
+            for c in chunks[:5]
+        ],
+    }
