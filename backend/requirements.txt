@@ -4,3 +4,4 @@ pydantic-settings
 qdrant-client
 redis
 psycopg[binary]
+sqlalchemy
