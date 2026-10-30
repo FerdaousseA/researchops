@@ -8,3 +8,4 @@ sqlalchemy
 python-multipart
 pypdf
 fastembed
+celery[redis]

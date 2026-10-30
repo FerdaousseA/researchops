@@ -16,6 +16,22 @@ services:
         condition: service_started
       qdrant:
         condition: service_started
+
+  worker:
+    build: ./backend
+    command: celery -A app.worker.celery_app worker --loglevel=info --concurrency=1
+    env_file: .env
+    volumes:
+      - ./backend:/app
+      - uploads_data:/data/uploads
+      - models_cache:/data/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      qdrant:
+        condition: service_started
   postgres:
     image: postgres:16-alpine
     environment:

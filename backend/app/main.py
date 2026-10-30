@@ -15,7 +15,7 @@ from app.database import Base, engine, get_db
 from app.ingestion import chunk_pdf
 from app.embeddings import embed_passages
 from app.vectorstore import index_chunks, search
-
+from app.worker import ingest_document
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -101,8 +101,12 @@ async def upload_document(
     )
     db.add(doc)
     db.commit()
+    
+    ingest_document.delay(str(doc.id))
 
     return {"id": str(doc.id), "filename": doc.filename, "status": doc.status}
+
+    
 
 @app.get("/documents/{doc_id}/chunks")
 def preview_chunks(doc_id: uuid.UUID, db: Session = Depends(get_db)):
@@ -137,25 +141,13 @@ def embed_test(doc_id: uuid.UUID, db: Session = Depends(get_db)):
         "first_values_of_chunk_0": vectors[0][:5] if vectors else [],
     }
 
-@app.post("/documents/{doc_id}/index")
+@app.post("/documents/{doc_id}/index", status_code=202)
 def index_document(doc_id: uuid.UUID, db: Session = Depends(get_db)):
     doc = db.get(models.Document, doc_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Document introuvable")
-
-    try:
-        chunks = chunk_pdf(Path(settings.upload_dir) / f"{doc_id}.pdf")
-        if not chunks:
-            raise ValueError("Aucun texte extractible dans ce PDF")
-        count = index_chunks(doc_id, doc.filename, chunks)
-        doc.status = "indexed"
-        db.commit()
-    except Exception as e:
-        doc.status = "failed"
-        db.commit()
-        raise HTTPException(status_code=500, detail=str(e))
-
-    return {"id": str(doc_id), "status": doc.status, "chunks_indexed": count}
+    ingest_document.delay(str(doc_id))
+    return {"id": str(doc_id), "status": "queued"}
 
 
 @app.get("/search")
